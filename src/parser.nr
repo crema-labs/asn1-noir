@@ -4,6 +4,13 @@ struct TLV {
     value: [u8; 512],
 }
 
+struct IntegerResult {
+    value: u64,
+    signed_value: i64, // Optional
+    is_negative: bool,
+    bit_length: u32,
+}
+
 // --------------------- Parsing Functions ---------------------
 
 fn decode_tlv(bytes: [u8; 512], offset: u32) -> (TLV, u32) {
@@ -43,6 +50,41 @@ fn decode_tlv(bytes: [u8; 512], offset: u32) -> (TLV, u32) {
 
     let total_len = 1 + len_size + length;
     (TLV { tag, length, value }, offset + total_len)
+}
+
+fn parse_integer(tlv: TLV) -> IntegerResult {
+    let mut unsigned: u64 = 0;
+    let mut is_negative = false;
+    let mut bit_length: u32 = 0;
+
+    if tlv.length > 0 {
+        let first_byte = tlv.value[0];
+        if (first_byte & 0x80) == 0x80 {
+            is_negative = true;
+        }
+
+        for i in 0..8 {
+            if i < tlv.length {
+                unsigned = (unsigned << 8) | (tlv.value[i] as u64);
+                bit_length += 8;
+            }
+        }
+    }
+
+    let signed_value: i64 = if is_negative {
+        if bit_length == 64 {
+            // avoid overflow: two's complement manually
+            let unsigned_i64 = unsigned as i64;
+            unsigned_i64
+        } else {
+            let two_pow_n = 1 as u64 << (bit_length as u8);
+            ((unsigned as i64) - (two_pow_n as i64))
+        }
+    } else {
+        unsigned as i64
+    };
+
+    IntegerResult { value: unsigned, signed_value, is_negative, bit_length }
 }
 
 
@@ -116,4 +158,26 @@ fn test_decode_tlv_nested_tlv_inside_sequence() {
     assert(inner_tlv.length == 1);
     assert(inner_tlv.value[0] == 0x01);
     assert(inner_offset == 3);
+}
+
+
+//? ------------------ Integer Parsing Tests ---------------------
+
+#[test]
+fn test_parse_integer() {
+    let tlv = TLV { tag: 0x02, length: 1, value: [0x2A; 512] };
+    let result = parse_integer(tlv);
+    assert(result.value == 42);
+    assert(result.signed_value == 42);
+    assert(result.is_negative == false);
+    assert(result.bit_length == 8);
+}
+#[test]
+fn test_parse_integer_neg1() {
+    let tlv = TLV { tag: 0x02, length: 1, value: [0xFF; 512] };
+    let result = parse_integer(tlv);
+    assert(result.value == 255);
+    assert(result.signed_value == -1);
+    assert(result.is_negative == true);
+    assert(result.bit_length == 8);
 }
