@@ -11,6 +11,12 @@ struct IntegerResult {
     bit_length: u32,
 }
 
+struct BitStringResult {
+    size: u32,
+    bits: [bool; 512],
+}
+
+
 // --------------------- Parsing Functions ---------------------
 
 fn decode_tlv(bytes: [u8; 512], offset: u32) -> (TLV, u32) {
@@ -86,6 +92,60 @@ fn parse_integer(tlv: TLV) -> IntegerResult {
 
     IntegerResult { value: unsigned, signed_value, is_negative, bit_length }
 }
+
+fn parse_bit_string(bytes: [u8; 512], start: u32, end: u32, max_length: u32) -> BitStringResult {
+    let unused_bits: u8 = bytes[start];
+    assert(unused_bits <= 7);
+
+    let bit_len: u32 = ((end - start - 1) * 8) - (unused_bits as u32);
+    let mut bits: [bool; 512] = [false; 512];
+    let mut bit_index: u32 = 0;
+
+    for i in 0..512 {
+        let in_lower_bound = i >= (start + 1);
+        let in_upper_bound = i < end;
+        let in_range = if in_lower_bound {
+            if in_upper_bound {
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        let skip = if i == end - 1 { unused_bits } else { 0 };
+        let bit_count = 8 - (skip as u32);
+
+        if in_range {
+            let byte: u8 = bytes[i];
+            for k in 0..8 {
+                let is_k_in_bounds = k < bit_count;
+                let is_bit_index_in_bounds = bit_index < max_length;
+                let should_write = if is_k_in_bounds {
+                    if is_bit_index_in_bounds {
+                        true
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
+
+                if should_write {
+                    let j: u8 = 7 - (k as u8);
+                    let mask = 1 << j;
+                    let result = (byte & mask) >> j;
+                    bits[bit_index] = result == 1;
+                    bit_index += 1;
+                }
+            }
+        }
+    }
+
+    BitStringResult { size: bit_len, bits }
+}
+
 
 // --------------------- Tests ---------------------
 
@@ -278,4 +338,91 @@ fn test_parse_integer_empty() {
     assert(result.signed_value == 0);
     assert(result.is_negative == false);
     assert(result.bit_length == 0);
+}
+
+//? ------------------ Bit String Parsing Tests with direct bytes ---------------------
+
+#[test]
+fn test_no_unused_bits_full_byte() {
+    // 00000000 -> all bits are 0
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 0; // unused bits = 0
+    bytes[1] = 0x00; // 8 bits: all false
+
+    let result = parse_bit_string(bytes, 0, 2, 512);
+    assert(result.size == 8);
+    for i in 0..8 {
+        assert(result.bits[i] == false);
+    }
+}
+
+#[test]
+fn test_no_unused_bits_mixed_bits() {
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 0; // unused bits = 0
+    bytes[1] = 170; // 0b10101010 in decimal, alternating bits
+
+    let result = parse_bit_string(bytes, 0, 2, 512);
+    assert(result.size == 8);
+    assert(result.bits[0] == true);
+    assert(result.bits[1] == false);
+    assert(result.bits[2] == true);
+    assert(result.bits[3] == false);
+    assert(result.bits[4] == true);
+    assert(result.bits[5] == false);
+    assert(result.bits[6] == true);
+    assert(result.bits[7] == false);
+}
+
+#[test]
+fn test_with_unused_bits_at_end() {
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 3; // 3 unused bits => 5 bits only from last byte
+    bytes[1] = 248; // only first 5 bits used: 11111
+
+    let result = parse_bit_string(bytes, 0, 2, 512);
+    assert(result.size == 5);
+    for i in 0..5 {
+        assert(result.bits[i] == true);
+    }
+}
+
+#[test]
+fn test_multiple_bytes_with_unused() {
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 2; // 2 unused bits in the last byte
+    bytes[1] = 204;
+    bytes[2] = 240; // only first 6 bits used: 111100 (0b11110000 = 240)
+
+    let result = parse_bit_string(bytes, 0, 3, 512);
+    assert(result.size == 14); // 8 (from first byte) + 6 = 14
+    let expected = [
+        true, true, false, false, true, true, false, false, // byte 1
+        true, true, true, true, false, false, // byte 2 (6 bits)
+    ];
+    for i in 0..14 {
+        assert(result.bits[i] == expected[i]);
+    }
+}
+
+#[test]
+fn test_all_ones_unused_zero() {
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 0;
+    bytes[1] = 0xFF;
+
+    let result = parse_bit_string(bytes, 0, 2, 512);
+    assert(result.size == 8);
+    for i in 0..8 {
+        assert(result.bits[i] == true);
+    }
+}
+
+#[test]
+fn test_empty_bit_string() {
+    let mut bytes: [u8; 512] = [0; 512];
+    bytes[0] = 0; // no unused bits
+
+    let result = parse_bit_string(bytes, 0, 1, 512);
+    assert(result.size == 0);
 }
