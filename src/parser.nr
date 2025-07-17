@@ -426,3 +426,114 @@ fn test_empty_bit_string() {
     let result = parse_bit_string(bytes, 0, 1, 512);
     assert(result.size == 0);
 }
+
+//? ------------------ Bit String Parsing Tests with TLV ---------------------
+#[test]
+fn test_no_unused_bits_full_byte_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+    // TLV format: Tag (0x03), Length (0x02), Value: [unused = 0, byte = 0x00]
+    bytes[0] = 0x03;
+    bytes[1] = 0x02;
+    bytes[2] = 0x00;
+    bytes[3] = 0x00;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 8);
+    for i in 0..8 {
+        assert(result.bits[i] == false);
+    }
+}
+
+#[test]
+fn test_no_unused_bits_mixed_bits_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+    // TLV: Tag, Length = 2, Value = [0 (unused), 0b10101010]
+    bytes[0] = 0x03;
+    bytes[1] = 0x02;
+    bytes[2] = 0x00;
+    bytes[3] = 170;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 8);
+    let expected = [true, false, true, false, true, false, true, false];
+    for i in 0..8 {
+        assert(result.bits[i] == expected[i]);
+    }
+}
+
+#[test]
+fn test_with_unused_bits_at_end_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+
+    bytes[0] = 0x03;
+    bytes[1] = 0x02;
+    bytes[2] = 3;
+    bytes[3] = 248;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 5);
+    for i in 0..5 {
+        assert(result.bits[i] == true);
+    }
+}
+
+#[test]
+fn test_multiple_bytes_with_unused_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+
+    bytes[0] = 0x03;
+    bytes[1] = 0x03;
+    bytes[2] = 2;
+    bytes[3] = 204;
+    bytes[4] = 240;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 14);
+    let expected = [
+        true, true, false, false, true, true, false, false, // byte 1
+        true, true, true, true, false, false, // byte 2 (6 bits)
+    ];
+    for i in 0..14 {
+        assert(result.bits[i] == expected[i]);
+    }
+}
+
+#[test]
+fn test_all_ones_unused_zero_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+    // TLV: Length = 2, Value = [0, 0xFF]
+    bytes[0] = 0x03;
+    bytes[1] = 0x02;
+    bytes[2] = 0;
+    bytes[3] = 0xFF;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 8);
+    for i in 0..8 {
+        assert(result.bits[i] == true);
+    }
+}
+
+#[test]
+fn test_empty_bit_string_with_tlv() {
+    let mut bytes: [u8; 512] = [0; 512];
+
+    bytes[0] = 0x03;
+    bytes[1] = 0x01;
+    bytes[2] = 0;
+
+    let (tlv, _) = decode_tlv(bytes, 0);
+    let result = parse_bit_string(tlv.value, 0, tlv.length, 512);
+
+    assert(result.size == 0);
+}
