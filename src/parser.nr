@@ -35,6 +35,11 @@ struct AlgorithmIdentifier {
     parameters: [u8; 64],
 }
 
+struct Validity {
+    not_before: [u8; 16],
+    not_after: [u8; 16],
+}
+
 // --------------------- Parsing Functions ---------------------
 
 fn decode_tlv(bytes: [u8; 512], offset: u32) -> (TLV, u32) {
@@ -281,6 +286,25 @@ fn parse_algorithm_identifier(tlv: TLV) -> AlgorithmIdentifier {
     params_bytes[1] = params_tlv.length as u8;
 
     AlgorithmIdentifier { oid: parsed_oid, parameters: params_bytes }
+}
+
+fn parse_validity(tlv: TLV) -> Validity {
+    let (not_before_tlv, offset) = decode_tlv(tlv.value, 0);
+    let (not_after_tlv, _) = decode_tlv(tlv.value, offset);
+
+    let mut not_before: [u8; 16] = [0; 16];
+    let mut not_after: [u8; 16] = [0; 16];
+
+    for i in 0..16 {
+        if i < not_before_tlv.length {
+            not_before[i] = not_before_tlv.value[i];
+        }
+        if i < not_after_tlv.length {
+            not_after[i] = not_after_tlv.value[i];
+        }
+    }
+
+    Validity { not_before, not_after }
 }
 
 // --------------------- Tests ---------------------
@@ -1144,4 +1168,123 @@ fn test_algorithm_identifier_truncated_oid() {
     assert(algo.oid[0] == 1);
     assert(algo.oid[1] == 2);
     assert(algo.oid[2] == 840);
+}
+
+
+//? ------------------ Validity Parsing Tests ---------------------
+
+#[test]
+fn test_parse_validity_utctime() {
+    let values: [u8; 32] = [
+        0x30, 0x1E, 0x17, 0x0D, 0x32, 0x33, 0x30, 0x36, 0x31, 0x35, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x5A, 0x17, 0x0D, 0x32, 0x34, 0x30, 0x36, 0x31, 0x35, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x30, 0x5A,
+    ];
+
+    let mut data = [0; 512];
+    for i in 0..32 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let validity = parse_validity(tlv);
+
+    assert(validity.not_before[0] == 0x32); // '2'
+    assert(validity.not_before[1] == 0x33); // '3'
+    assert(validity.not_before[11] == 0x30); // '0'
+    assert(validity.not_before[12] == 0x5A); // 'Z'
+
+    assert(validity.not_after[0] == 0x32); // '2'
+    assert(validity.not_after[1] == 0x34); // '4'
+    assert(validity.not_after[11] == 0x30); // '0'
+    assert(validity.not_after[12] == 0x5A); // 'Z'
+}
+#[test]
+fn test_parse_validity_min_date() {
+    let values: [u8; 32] = [
+        0x30, 0x1E, 0x17, 0x0D, // UTCTime
+        0x30, 0x30, 0x30, 0x10, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30, 0x5A, // "00001001000000Z"
+        0x17, 0x0D, // UTCTime
+        0x30, 0x30, 0x30, 0x12, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x5A, // "00001201000000Z"
+    ];
+
+    let mut data = [0 as u8; 512];
+    for i in 0..32 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let validity = parse_validity(tlv);
+
+    assert(validity.not_before[0] == 0x30); // '0'
+    assert(validity.not_before[1] == 0x30); // '0'
+    assert(validity.not_before[12] == 0x5A); // 'Z'
+
+    assert(validity.not_after[0] == 0x30); // '0'
+    assert(validity.not_after[1] == 0x30); // '0'
+    assert(validity.not_after[12] == 0x5A); // 'Z'
+}
+
+#[test]
+fn test_parse_validity_future_date() {
+    let values: [u8; 32] = [
+        0x30, 0x1E, 0x17, 0x0D, 0x32, 0x39, 0x31, 0x32, 0x33, 0x31, 0x32, 0x33, 0x35, 0x39, 0x35,
+        0x39, 0x5A, // "291231235959Z"
+        0x17, 0x0D, 0x33, 0x30, 0x30, 0x31, 0x30, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x5A, // "300101000000Z"
+    ];
+
+    let mut data = [0 as u8; 512];
+    for i in 0..32 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let validity = parse_validity(tlv);
+
+    assert(validity.not_before[0] == 0x32); // '2'
+    assert(validity.not_before[1] == 0x39); // '9'
+    assert(validity.not_before[12] == 0x5A); // 'Z'
+
+    assert(validity.not_after[0] == 0x33); // '3'
+    assert(validity.not_after[1] == 0x30); // '0'
+    assert(validity.not_after[12] == 0x5A); // 'Z'
+}
+
+#[test]
+fn test_parse_validity_diff_times() {
+    // Validity:
+    // not_before: "230101120000Z" => 0x32, 0x33, 0x30, 0x31, 0x30, 0x31, 0x31, 0x32, 0x30, 0x30, 0x30, 0x30, 0x5A
+    // not_after:  "250101134567Z" => 0x32, 0x35, 0x30, 0x31, 0x30, 0x31, 0x31, 0x33, 0x34, 0x35, 0x36, 0x37, 0x5A
+
+    let values: [u8; 32] = [
+        0x30, 0x1E, // SEQUENCE, length 30
+        0x17, 0x0D, // UTCTime (13 bytes)
+        0x32, 0x33, 0x30, 0x31, 0x30, 0x31, 0x31, 0x32, 0x30, 0x30, 0x30, 0x30, 0x5A, // "230101120000Z"
+        0x17, 0x0D, // UTCTime (13 bytes)
+        0x32, 0x35, 0x30, 0x31, 0x30, 0x31, 0x31, 0x33, 0x34, 0x35, 0x36, 0x37,
+        0x5A, // "250101134567Z"
+    ];
+
+    let mut data = [0 as u8; 512];
+    for i in 0..32 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let validity = parse_validity(tlv);
+
+    // Check not_before == "230101120000Z"
+    assert(validity.not_before[0] == 0x32); // '2'
+    assert(validity.not_before[1] == 0x33); // '3'
+    assert(validity.not_before[6] == 0x31); // '1'
+    assert(validity.not_before[12] == 0x5A); // 'Z'
+
+    // Check not_after == "250101134567Z"
+    assert(validity.not_after[0] == 0x32); // '2'
+    assert(validity.not_after[1] == 0x35); // '5'
+    assert(validity.not_after[7] == 0x33); // '3'
+    assert(validity.not_after[11] == 0x37); // '7'
+    assert(validity.not_after[12] == 0x5A); // 'Z'
 }
