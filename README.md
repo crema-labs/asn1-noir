@@ -324,13 +324,13 @@ Now, let's walk through how the parsing algorithm would process the first 5 elem
 
 
 we can look at first bytes of each array and determine its tag class and decode according to get value.
-## 🔗 Resources
+## Resources
 
 - ASN.1 TLV Format – [RFC 5280](https://datatracker.ietf.org/doc/html/rfc5280)  
 - OID Reference – [oid-info.com](http://oid-info.com/)  
 - ASN.1 Playground – [lapo.it/asn1js](https://lapo.it/asn1js/)  
 
-## 👨‍🔬 Built With
+## Built With
 
 - [Noir](https://noir-lang.org/)  
 - [Nargo](https://github.com/noir-lang/noir)  
