@@ -448,47 +448,91 @@ fn parse_subject_public_key_info(tlv: TLV) -> SubjectPublicKeyInfo {
     SubjectPublicKeyInfo { algorithm, public_key: bit_result.bits }
 }
 
-fn parse_name(tlv: TLV) -> Name {
+// fn parse_name(tlv: TLV) -> Name {
+//     let mut rdns: [RelativeDistinguishedName; 16] = [
+//         RelativeDistinguishedName {
+//             set: [AttributeTypeAndValue { oid: [0; 64], value: [0; 64] }; 8],
+//             count: 0,
+//         }; 16
+//     ];
+
+//     let mut offset: u32 = 0;
+//     let mut count: u8 = 0;
+
+//     for i in 0..16 {
+//         let in_bounds = offset < tlv.length;
+
+//         if in_bounds {
+//             let (rdn_tlv, new_offset) = decode_tlv(tlv.value, offset);
+//             let mut rdn = RelativeDistinguishedName {
+//                 set: [AttributeTypeAndValue { oid: [0; 64], value: [0; 64] }; 8],
+//                 count: 0,
+//             };
+
+//             let mut inner_off: u32 = 0;
+//             for j in 0..8 {
+//                 let has_more = inner_off < rdn_tlv.length;
+//                 if has_more {
+//                     let (attr_tlv, next_inner) = decode_tlv(rdn_tlv.value, inner_off);
+//                     rdn.set[j] = parse_attribute_type_and_value(attr_tlv);
+//                     rdn.count += 1;
+//                     inner_off = next_inner;
+//                 }
+//             }
+
+//             rdns[i] = rdn;
+//             offset = new_offset;
+//             count += 1;
+//         }
+//     }
+
+//     Name { rdns, count }
+// }
+
+
+unconstrained fn parse_name(tlv: TLV) -> Name {
     let mut rdns: [RelativeDistinguishedName; 16] = [
         RelativeDistinguishedName {
             set: [AttributeTypeAndValue { oid: [0; 64], value: [0; 64] }; 8],
             count: 0,
         }; 16
     ];
-
-    let mut offset: u32 = 0;
-    let mut count: u8 = 0;
+    let mut outer_offset: u32 = 0;
+    let mut name_count: u8 = 0;
 
     for i in 0..16 {
-        let in_bounds = offset < tlv.length;
+        if outer_offset >= tlv.length {
+            break;
+        }
 
-        if in_bounds {
-            let (rdn_tlv, new_offset) = decode_tlv(tlv.value, offset);
-            let mut rdn = RelativeDistinguishedName {
-                set: [AttributeTypeAndValue { oid: [0; 64], value: [0; 64] }; 8],
-                count: 0,
-            };
+        // Decode one RDN (SET)
+        let (rdn_tlv, next_outer_offset) = decode_tlv(tlv.value, outer_offset);
+        outer_offset = next_outer_offset;
 
-            let mut inner_off: u32 = 0;
-            for j in 0..8 {
-                let has_more = inner_off < rdn_tlv.length;
-                if has_more {
-                    let (attr_tlv, next_inner) = decode_tlv(rdn_tlv.value, inner_off);
-                    rdn.set[j] = parse_attribute_type_and_value(attr_tlv);
-                    rdn.count += 1;
-                    inner_off = next_inner;
-                }
+        let mut rdn = RelativeDistinguishedName {
+            set: [AttributeTypeAndValue { oid: [0; 64], value: [0; 64] }; 8],
+            count: 0,
+        };
+
+        let mut inner_offset: u32 = 0;
+        for j in 0..8 {
+            if inner_offset >= rdn_tlv.length {
+                break;
             }
 
-            rdns[i] = rdn;
-            offset = new_offset;
-            count += 1;
+            // Decode one AttributeTypeAndValue (SEQUENCE inside SET)
+            let (attr_tlv, next_inner_offset) = decode_tlv(rdn_tlv.value, inner_offset);
+            rdn.set[j] = parse_attribute_type_and_value(attr_tlv);
+            rdn.count += 1;
+            inner_offset = next_inner_offset;
         }
+
+        rdns[i] = rdn;
+        name_count += 1;
     }
 
-    Name { rdns, count }
+    Name { rdns, count: name_count }
 }
-
 // --------------------- Tests ---------------------
 
 //? ------------------ TLV Decoding Tests ---------------------
