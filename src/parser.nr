@@ -406,6 +406,21 @@ fn decode_tlv_with_offset(bytes: [u8; 512], offset: u32) -> (TLV, u32, u32) {
     (TLV { tag, length, value }, offset + total_len, val_offset)
 }
 
+fn parse_subject_public_key_info(tlv: TLV) -> SubjectPublicKeyInfo {
+    let (algo_tlv, algo_end_offset, _) = decode_tlv_with_offset(tlv.value, 0);
+    let (bitstring_tlv, _, bit_val_start) = decode_tlv_with_offset(tlv.value, algo_end_offset);
+
+    let algorithm = parse_algorithm_identifier(algo_tlv);
+
+    let bit_result = parse_bit_string(
+        tlv.value,
+        bit_val_start,
+        bit_val_start + bitstring_tlv.length,
+        512,
+    );
+
+    SubjectPublicKeyInfo { algorithm, public_key: bit_result.bits }
+}
 
 // --------------------- Tests ---------------------
 
@@ -1444,4 +1459,71 @@ fn test_parse_extensions_with_critical() {
     assert(extensions[0].oid[3] == 15);
     assert(extensions[0].critical == true);
     assert(extensions[0].value[0] == 0x03);
+}
+
+
+//? ------------------ Subject Public Key Info Parsing Tests ---------------------
+
+#[test]
+fn test_parse_subject_public_key_info_simple3() {
+    let values: [u8; 24] = [
+        0x30, 0x16,             // SEQUENCE (22 bytes)
+        0x30, 0x06,             // AlgorithmIdentifier
+        0x06, 0x01, 0x2A,       // OID = 1.2
+        0x05, 0x00,             // NULL
+        0x03, 0x0C,             // BIT STRING, length 12
+        0x00,                   // unused bits = 0
+        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, // 6 bytes key
+        0x00, 0x00, 0x00, 0x00, // padding
+        0x00, 0x00
+    ];
+
+    let mut data = [0; 512];
+    for i in 0..24 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let pubkey_info = parse_subject_public_key_info(tlv);
+
+    assert(pubkey_info.public_key[0] == true);
+    assert(pubkey_info.public_key[1] == false);
+    assert(pubkey_info.public_key[2] == true);
+    assert(pubkey_info.public_key[3] == false);
+    assert(pubkey_info.public_key[4] == true);
+    assert(pubkey_info.public_key[5] == false);
+    assert(pubkey_info.public_key[6] == true);
+    assert(pubkey_info.public_key[7] == false);
+}
+
+#[test]
+fn test_parse_subject_public_key_info_simple2() {
+    let values: [u8; 22] = [
+        0x30, 0x14,             // SEQUENCE
+        0x30, 0x06,             // AlgorithmIdentifier
+        0x06, 0x01, 0x2A,       // OID
+        0x05, 0x00,             // NULL
+        0x03, 0x08,             // BIT STRING, length 8
+        0x00,                   // unused bits = 0
+        0xAA, 0x55, 0xAA, 0x55, // 4 bytes data
+        0x00, 0x00, 0x00, 0x00, // padding
+        0x00, 0x00,             // padding
+    ];
+
+    let mut data = [0; 512];
+    for i in 0..22 {
+        data[i] = values[i];
+    }
+
+    let (tlv, _) = decode_tlv(data, 0);
+    let pubkey_info = parse_subject_public_key_info(tlv);
+
+    assert(pubkey_info.public_key[0] == true);
+    assert(pubkey_info.public_key[1] == false);
+    assert(pubkey_info.public_key[2] == true);
+    assert(pubkey_info.public_key[3] == false);
+    assert(pubkey_info.public_key[4] == true);
+    assert(pubkey_info.public_key[5] == false);
+    assert(pubkey_info.public_key[6] == true);
+    assert(pubkey_info.public_key[7] == false);
 }
