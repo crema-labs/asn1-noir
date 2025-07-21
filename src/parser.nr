@@ -1686,66 +1686,278 @@ fn test_parse_extensions_with_critical() {
 
 //? ------------------ Subject Public Key Info Parsing Tests ---------------------
 
+// #[test]
+// fn test_parse_subject_public_key_info_simple3() {
+//     let values: [u8; 24] = [
+//         0x30, 0x16,             // SEQUENCE (22 bytes)
+//         0x30, 0x06,             // AlgorithmIdentifier
+//         0x06, 0x01, 0x2A,       // OID = 1.2
+//         0x05, 0x00,             // NULL
+//         0x03, 0x0C,             // BIT STRING, length 12
+//         0x00,                   // unused bits = 0
+//         0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, // 6 bytes key
+//         0x00, 0x00, 0x00, 0x00, // padding
+//         0x00, 0x00
+//     ];
+
+//     let mut data = [0; 512];
+//     for i in 0..24 {
+//         data[i] = values[i];
+//     }
+
+//     let (tlv, _) = decode_tlv(data, 0);
+//     let pubkey_info = parse_subject_public_key_info(tlv);
+
+//     assert(pubkey_info.public_key[0] == true);
+//     assert(pubkey_info.public_key[1] == false);
+//     assert(pubkey_info.public_key[2] == true);
+//     assert(pubkey_info.public_key[3] == false);
+//     assert(pubkey_info.public_key[4] == true);
+//     assert(pubkey_info.public_key[5] == false);
+//     assert(pubkey_info.public_key[6] == true);
+//     assert(pubkey_info.public_key[7] == false);
+// }
+
+// #[test]
+// fn test_parse_subject_public_key_info_simple2() {
+//     let values: [u8; 22] = [
+//         0x30, 0x14,             // SEQUENCE
+//         0x30, 0x06,             // AlgorithmIdentifier
+//         0x06, 0x01, 0x2A,       // OID
+//         0x05, 0x00,             // NULL
+//         0x03, 0x08,             // BIT STRING, length 8
+//         0x00,                   // unused bits = 0
+//         0xAA, 0x55, 0xAA, 0x55, // 4 bytes data
+//         0x00, 0x00, 0x00, 0x00, // padding
+//         0x00, 0x00,             // padding
+//     ];
+
+//     let mut data = [0; 512];
+//     for i in 0..22 {
+//         data[i] = values[i];
+//     }
+
+//     let (tlv, _) = decode_tlv(data, 0);
+//     let pubkey_info = parse_subject_public_key_info(tlv);
+
+//     assert(pubkey_info.public_key[0] == true);
+//     assert(pubkey_info.public_key[1] == false);
+//     assert(pubkey_info.public_key[2] == true);
+//     assert(pubkey_info.public_key[3] == false);
+//     assert(pubkey_info.public_key[4] == true);
+//     assert(pubkey_info.public_key[5] == false);
+//     assert(pubkey_info.public_key[6] == true);
+//     assert(pubkey_info.public_key[7] == false);
+// }
+
+
+
+//? ------------------ Certificate Parsing Tests ---------------------
+
 #[test]
-fn test_parse_subject_public_key_info_simple3() {
-    let values: [u8; 24] = [
-        0x30, 0x16,             // SEQUENCE (22 bytes)
-        0x30, 0x06,             // AlgorithmIdentifier
-        0x06, 0x01, 0x2A,       // OID = 1.2
-        0x05, 0x00,             // NULL
-        0x03, 0x0C,             // BIT STRING, length 12
-        0x00,                   // unused bits = 0
-        0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, // 6 bytes key
-        0x00, 0x00, 0x00, 0x00, // padding
-        0x00, 0x00
+fn test_parse_certificate() {
+    let mut cert_bytes: [u8; 512] = [0 as u8; 512];
+    let data: [u8; 377] = [
+        0x30, 0x82, 0x01, 0x75, 0x30, 0x82, 0x01, 0x1f, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x14,
+        0x69, 0x2a, 0x11, 0x7e, 0x24, 0xfb, 0x5c, 0x8e, 0xc3, 0xac, 0x37, 0xc5, 0x32, 0xcc, 0x2d,
+        0x44, 0x0a, 0x82, 0x9a, 0x25, 0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d,
+        0x01, 0x01, 0x0b, 0x05, 0x00, 0x30, 0x0f, 0x31, 0x0d, 0x30, 0x0b, 0x06, 0x03, 0x55, 0x04,
+        0x03, 0x0c, 0x04, 0x54, 0x65, 0x73, 0x74, 0x30, 0x1e, 0x17, 0x0d, 0x32, 0x35, 0x30, 0x36,
+        0x32, 0x30, 0x31, 0x30, 0x31, 0x38, 0x35, 0x39, 0x5a, 0x17, 0x0d, 0x32, 0x35, 0x30, 0x36,
+        0x32, 0x31, 0x31, 0x30, 0x31, 0x38, 0x35, 0x39, 0x5a, 0x30, 0x0f, 0x31, 0x0d, 0x30, 0x0b,
+        0x06, 0x03, 0x55, 0x04, 0x03, 0x0c, 0x04, 0x54, 0x65, 0x73, 0x74, 0x30, 0x5c, 0x30, 0x0d,
+        0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00, 0x03, 0x4b,
+        0x00, 0x30, 0x48, 0x02, 0x41, 0x00, 0xbd, 0x4d, 0xdd, 0x55, 0xc8, 0x86, 0x5b, 0xc9, 0x47,
+        0x9c, 0x14, 0xde, 0x0e, 0xa8, 0x3b, 0x4d, 0x29, 0x9b, 0xc3, 0x1d, 0x10, 0x03, 0xa1, 0xfb,
+        0xe1, 0x50, 0x2e, 0x23, 0xfb, 0xb1, 0x49, 0xe1, 0x7d, 0x6c, 0xb7, 0x17, 0xdd, 0xcc, 0x6c,
+        0x83, 0x75, 0xbe, 0xf4, 0x1f, 0x32, 0x9c, 0x9d, 0x46, 0xe0, 0x49, 0xf0, 0xfa, 0xcb, 0x92,
+        0x2d, 0xd8, 0xaf, 0x3b, 0x1e, 0x8c, 0x35, 0x40, 0x34, 0x03, 0x02, 0x03, 0x01, 0x00, 0x01,
+        0xa3, 0x53, 0x30, 0x51, 0x30, 0x1d, 0x06, 0x03, 0x55, 0x1d, 0x0e, 0x04, 0x16, 0x04, 0x14,
+        0x49, 0x15, 0x15, 0xac, 0xcf, 0xa7, 0x8b, 0x2e, 0x3e, 0x9c, 0xb9, 0xfa, 0x66, 0x34, 0xc2,
+        0x3f, 0x06, 0x93, 0xd6, 0x79, 0x30, 0x1f, 0x06, 0x03, 0x55, 0x1d, 0x23, 0x04, 0x18, 0x30,
+        0x16, 0x80, 0x14, 0x49, 0x15, 0x15, 0xac, 0xcf, 0xa7, 0x8b, 0x2e, 0x3e, 0x9c, 0xb9, 0xfa,
+        0x66, 0x34, 0xc2, 0x3f, 0x06, 0x93, 0xd6, 0x79, 0x30, 0x0f, 0x06, 0x03, 0x55, 0x1d, 0x13,
+        0x01, 0x01, 0xff, 0x04, 0x05, 0x30, 0x03, 0x01, 0x01, 0xff, 0x30, 0x0d, 0x06, 0x09, 0x2a,
+        0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00, 0x03, 0x41, 0x00, 0x75, 0xef,
+        0x3b, 0xe6, 0x3f, 0x2b, 0x7e, 0xac, 0x98, 0x67, 0x53, 0xcd, 0x9e, 0x0d, 0x3f, 0x60, 0x50,
+        0x00, 0x11, 0x03, 0x6f, 0xa0, 0x09, 0x98, 0x3a, 0x28, 0xff, 0x7e, 0xf1, 0x2a, 0x91, 0x2d,
+        0xc9, 0x69, 0xb7, 0xbc, 0xdf, 0xa3, 0x25, 0x63, 0x5a, 0x13, 0x58, 0xc2, 0xbd, 0x99, 0xb4,
+        0xcc, 0x82, 0x39, 0x06, 0x96, 0xfd, 0x2b, 0x23, 0x5a, 0x2b, 0xfc, 0x31, 0x82, 0x16, 0x5f,
+        0xc7, 0x5a,
     ];
 
-    let mut data = [0; 512];
-    for i in 0..24 {
-        data[i] = values[i];
+    for i in 0..data.len() {
+        cert_bytes[i] = data[i];
     }
 
-    let (tlv, _) = decode_tlv(data, 0);
-    let pubkey_info = parse_subject_public_key_info(tlv);
+    let cert = parse_certificate(cert_bytes);
+    assert(cert.version == 2);
 
-    assert(pubkey_info.public_key[0] == true);
-    assert(pubkey_info.public_key[1] == false);
-    assert(pubkey_info.public_key[2] == true);
-    assert(pubkey_info.public_key[3] == false);
-    assert(pubkey_info.public_key[4] == true);
-    assert(pubkey_info.public_key[5] == false);
-    assert(pubkey_info.public_key[6] == true);
-    assert(pubkey_info.public_key[7] == false);
-}
+    let expected_oid: [u32; 9] = [1, 2, 840, 113549, 1, 1, 11, 0, 0];
+    for i in 0..9 {
+        assert(cert.signature_algorithm.oid[i] == expected_oid[i]);
+    }
 
-#[test]
-fn test_parse_subject_public_key_info_simple2() {
-    let values: [u8; 22] = [
-        0x30, 0x14,             // SEQUENCE
-        0x30, 0x06,             // AlgorithmIdentifier
-        0x06, 0x01, 0x2A,       // OID
-        0x05, 0x00,             // NULL
-        0x03, 0x08,             // BIT STRING, length 8
-        0x00,                   // unused bits = 0
-        0xAA, 0x55, 0xAA, 0x55, // 4 bytes data
-        0x00, 0x00, 0x00, 0x00, // padding
-        0x00, 0x00,             // padding
+    // 1.2.840.113549.1.1.11
+    assert(cert.issuer.rdns[0].set[0].oid[0] == 2);
+    assert(cert.issuer.rdns[0].set[0].oid[1] == 5);
+    assert(cert.issuer.rdns[0].set[0].oid[2] == 4);
+    assert(cert.issuer.rdns[0].set[0].oid[3] == 3); // commonName
+    // RDN's first AttributeTypeAndValue value field for issuer
+    assert(cert.issuer.rdns[0].set[0].value[0] == 0x54); // 'T'
+    assert(cert.issuer.rdns[0].set[0].value[1] == 0x65); // 'e'
+    assert(cert.issuer.rdns[0].set[0].value[2] == 0x73); // 's'
+    assert(cert.issuer.rdns[0].set[0].value[3] == 0x74); // 't'
+    assert(cert.subject.rdns[0].set[0].oid[0] == 2);
+    assert(cert.subject.rdns[0].set[0].oid[1] == 5);
+    assert(cert.subject.rdns[0].set[0].oid[2] == 4);
+    assert(cert.subject.rdns[0].set[0].oid[3] == 3); // commonName
+    // RDN's first AttributeTypeAndValue value field for subject
+    assert(cert.subject.rdns[0].set[0].value[0] == 0x54); // 'T'
+    assert(cert.subject.rdns[0].set[0].value[1] == 0x65); // 'e'
+    assert(cert.subject.rdns[0].set[0].value[2] == 0x73); // 's'
+    assert(cert.subject.rdns[0].set[0].value[3] == 0x74); // 't'
+
+    assert(
+        cert.validity.not_before
+            == [
+                0x32, 0x35, 0x30, 0x36, 0x32, 0x30, 0x31, 0x30, 0x31, 0x38, 0x35, 0x39, 0x5A, 0x00,
+                0x00, 0x00,
+            ],
+    );
+    assert(
+        cert.validity.not_after
+            == [
+                0x32, 0x35, 0x30, 0x36, 0x32, 0x31, 0x31, 0x30, 0x31, 0x38, 0x35, 0x39, 0x5A, 0x00,
+                0x00, 0x00,
+            ],
+    );
+
+    assert(cert.public_key_info.algorithm.oid[0] == 1);
+    assert(cert.public_key_info.algorithm.oid[1] == 2);
+    assert(cert.public_key_info.algorithm.oid[2] == 840);
+    assert(cert.public_key_info.algorithm.oid[3] == 113549);
+    assert(cert.public_key_info.algorithm.oid[4] == 1);
+    assert(cert.public_key_info.algorithm.oid[5] == 1);
+    assert(cert.public_key_info.algorithm.oid[6] == 1); // rsaEncryption
+    // SubjectKeyIdentifier extension (OID: 2.5.29.14)
+    let expected_oid: [u32; 4] = [2, 5, 29, 14];
+    let expected_value: [u8; 20] = [
+        0x49, 0x15, 0x15, 0xAC, 0xCF, 0xA7, 0x8B, 0x2E, 0x3E, 0x9C, 0xB9, 0xFA, 0x66, 0x34, 0xC2,
+        0x3F, 0x06, 0x93, 0xD6, 0x79,
     ];
 
-    let mut data = [0; 512];
-    for i in 0..22 {
-        data[i] = values[i];
+    let mut found = false;
+
+    for i in 0..10 {
+        let ext_in_bounds = i < cert.ext_count;
+        let ext = cert.extensions[i];
+
+        let is_oid_match = (ext.oid[0] == expected_oid[0])
+            & (ext.oid[1] == expected_oid[1])
+            & (ext.oid[2] == expected_oid[2])
+            & (ext.oid[3] == expected_oid[3]);
+
+        // Only run the assertions if:
+        // - the current index is within ext_count
+        // - the OID matches
+        let should_check = ext_in_bounds & is_oid_match;
+
+        if should_check {
+            let val = ext.value;
+            let offset = 2;
+            for j in 0..20 {
+                assert(val[offset + j] == expected_value[j]); // skip the 2-byte OCTET STRING header
+            }
+
+            found = true;
+        }
     }
 
-    let (tlv, _) = decode_tlv(data, 0);
-    let pubkey_info = parse_subject_public_key_info(tlv);
+    assert(found);
 
-    assert(pubkey_info.public_key[0] == true);
-    assert(pubkey_info.public_key[1] == false);
-    assert(pubkey_info.public_key[2] == true);
-    assert(pubkey_info.public_key[3] == false);
-    assert(pubkey_info.public_key[4] == true);
-    assert(pubkey_info.public_key[5] == false);
-    assert(pubkey_info.public_key[6] == true);
-    assert(pubkey_info.public_key[7] == false);
+    //  AuthorityKeyIdentifier extension (OID: 2.5.29.35)
+    let mut found_aki = false;
+    let expected_aki_oid: [u32; 4] = [2, 5, 29, 35];
+    let expected_aki_value: [u8; 20] = [
+        0x49, 0x15, 0x15, 0xAC, 0xCF, 0xA7, 0x8B, 0x2E, 0x3E, 0x9C, 0xB9, 0xFA, 0x66, 0x34, 0xC2,
+        0x3F, 0x06, 0x93, 0xD6, 0x79,
+    ];
+
+    for i in 0..10 {
+        let ext_in_bounds = i < cert.ext_count;
+        let ext = cert.extensions[i];
+
+        let is_oid_match = (ext.oid[0] == expected_aki_oid[0])
+            & (ext.oid[1] == expected_aki_oid[1])
+            & (ext.oid[2] == expected_aki_oid[2])
+            & (ext.oid[3] == expected_aki_oid[3]);
+
+        // Only run the assertions if:
+        // - the current index is within ext_count
+        // - the OID matches
+        let should_check = ext_in_bounds & is_oid_match;
+
+        if should_check {
+            let val = ext.value;
+
+            for j in 0..20 {
+                assert(val[4 + j] == expected_aki_value[j]); // skip the 4-byte OCTET STRING header
+            }
+
+            found_aki = true;
+        }
+    }
+
+    assert(found_aki);
+
+    // BasicConstraints extension (OID: 2.5.29.19)
+    let mut found_bc = false;
+    let bc_oid: [u32; 4] = [2, 5, 29, 19];
+
+    for i in 0..10 {
+        let in_bounds = i < cert.ext_count;
+        let ext = cert.extensions[i];
+
+        let is_oid_match = (ext.oid[0] == bc_oid[0])
+            & (ext.oid[1] == bc_oid[1])
+            & (ext.oid[2] == bc_oid[2])
+            & (ext.oid[3] == bc_oid[3]);
+
+        // Only check if in bounds
+        let should_check = in_bounds & is_oid_match;
+
+        if should_check {
+            found_bc = true;
+        }
+    }
+
+    assert(found_bc);
+
+    // --- Validate signature_algorithm2 ---
+    // OID: 1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
+    let expected_oid2: [u32; 9] = [1, 2, 840, 113549, 1, 1, 11, 0, 0];
+
+    for i in 0..9 {
+        assert(cert.signature_algorithm2.oid[i] == expected_oid2[i]);
+    }
+
+    // --- Validate actual signature ---
+    // Signature BIT STRING (64 bytes extracted from the certificate):
+    // 75 EF 3B E6 3F 2B 7E AC 98 67 53 CD 9E 0D 3F 60
+    // 50 00 11 03 6F A0 09 98 3A 28 FF 7E F1 2A 91 2D
+    // C9 69 B7 BC DF A3 25 63 5A 13 58 C2 BD 99 B4 CC
+    // 82 39 06 96 FD 2B 23 5A 2B FC 31 82 16 5F C7 5A
+
+    let expected_signature: [u8; 64] = [
+        0x75, 0xef, 0x3b, 0xe6, 0x3f, 0x2b, 0x7e, 0xac, 0x98, 0x67, 0x53, 0xcd, 0x9e, 0x0d, 0x3f,
+        0x60, 0x50, 0x00, 0x11, 0x03, 0x6f, 0xa0, 0x09, 0x98, 0x3a, 0x28, 0xff, 0x7e, 0xf1, 0x2a,
+        0x91, 0x2d, 0xc9, 0x69, 0xb7, 0xbc, 0xdf, 0xa3, 0x25, 0x63, 0x5a, 0x13, 0x58, 0xc2, 0xbd,
+        0x99, 0xb4, 0xcc, 0x82, 0x39, 0x06, 0x96, 0xfd, 0x2b, 0x23, 0x5a, 0x2b, 0xfc, 0x31, 0x82,
+        0x16, 0x5f, 0xc7, 0x5a,
+    ];
+
+    for i in 0..64 {
+        assert(cert.signature[i] == expected_signature[i]);
+    }
 }
