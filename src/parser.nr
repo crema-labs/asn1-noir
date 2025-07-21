@@ -61,6 +61,22 @@ struct Extension {
     value: [u8; 256],
 }
 
+// --------------------- Final Certificate ---------------------
+
+struct Certificate {
+    version: u8,
+    serial_number: [u8; 20],
+    signature_algorithm: AlgorithmIdentifier,
+    issuer: Name,
+    validity: Validity,
+    subject: Name,
+    public_key_info: SubjectPublicKeyInfo,
+    extensions: [Extension; 10],
+    ext_count: u8,
+    signature_algorithm2: AlgorithmIdentifier,
+    signature: [u8; 256],
+}
+
 // --------------------- Parsing Functions ---------------------
 
 fn decode_tlv(bytes: [u8; 512], offset: u32) -> (TLV, u32) {
