@@ -1,9 +1,12 @@
 pub mod parser;
-fn main(x: Field, y: pub Field) {
-    assert(x != y);
-}
+pub fn main(cert_bytes: [u8; 512], expected_subject_cn: [u8; 4]) {
+    let cert = unsafe { parser::parse_certificate(cert_bytes) };
 
-#[test]
-fn test_main() {
-    main(1, 2);
+    // Extract subject CN: usually in subject.rdns[0].set[0].value
+    let actual_cn = cert.subject.rdns[0].set[0].value;
+
+    // Compare with expected
+    for i in 0..4 {
+        assert(actual_cn[i] == expected_subject_cn[i]);
+    }
 }
