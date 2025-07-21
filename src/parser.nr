@@ -543,7 +543,7 @@ fn parse_certificate(data: [u8; 512]) -> Certificate {
     let (tbs_tlv, off1) = decode_tlv(cert_tlv.value, offset);
     offset = off1;
 
-    // // 2. signatureAlgorithm (AlgorithmIdentifier)
+    // 2. signatureAlgorithm (AlgorithmIdentifier)
     let (sig_algo_tlv, off2) = decode_tlv(cert_tlv.value, offset);
     offset = off2;
 
@@ -582,7 +582,7 @@ fn parse_certificate(data: [u8; 512]) -> Certificate {
     let issuer = unsafe{ parse_name(issuer_tlv) }; // implement below
     inner_offset = off_issuer;
 
-    // // e. validity
+    // e. validity
     let (validity_tlv, off_validity) = decode_tlv(tbs_tlv.value, inner_offset);
     let validity = parse_validity(validity_tlv);
     inner_offset = off_validity;
@@ -1960,4 +1960,71 @@ fn test_parse_certificate() {
     for i in 0..64 {
         assert(cert.signature[i] == expected_signature[i]);
     }
+}
+
+
+#[test]
+fn test_parse_certificate_simple() {
+    let mut cert_bytes: [u8; 512] = [0; 512];
+    let data: [u8; 147] = [
+        0x30, 0x81, 0xb3, 0x30, 0x81, 0x8f, 0xa0, 0x03, 0x02, 0x01, 0x02, 0x02, 0x01, 0x01, 0x30,
+        0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00, 0x30,
+        0x0b, 0x31, 0x09, 0x30, 0x07, 0x06, 0x03, 0x55, 0x04, 0x03, 0x0c, 0x02, 0x43, 0x4e, 0x30,
+        0x1e, 0x17, 0x0d, 0x32, 0x35, 0x30, 0x36, 0x31, 0x36, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x5a, 0x17, 0x0d, 0x32, 0x35, 0x30, 0x36, 0x32, 0x36, 0x31, 0x30, 0x30, 0x30, 0x30, 0x30,
+        0x5a, 0x30, 0x0b, 0x31, 0x09, 0x30, 0x07, 0x06, 0x03, 0x55, 0x04, 0x03, 0x0c, 0x02, 0x43,
+        0x4e, 0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05,
+        0x00, 0x03, 0x0c, 0x00, 0xa3, 0x1d, 0x30, 0x1b, 0x30, 0x19, 0x06, 0x03, 0x55, 0x1d, 0x13,
+        0x01, 0x01, 0xff, 0x04, 0x05, 0x30, 0x03, 0x01, 0x01, 0xff, 0x30, 0x0d, 0x06, 0x09, 0x2a,
+        0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b, 0x05, 0x00, 0x03, 0x00,
+    ];
+
+    for i in 0..data.len() {
+        cert_bytes[i] = data[i];
+    }
+
+    let cert = parse_certificate(cert_bytes);
+
+    // Basic structure checks
+    assert(cert.version == 2);
+    assert(cert.serial_number[0] == 1);
+
+    // Signature algorithm OID: 1.2.840.113549.1.1.11 (sha256WithRSAEncryption)
+    let sig_oid = [1, 2, 840, 113549, 1, 1, 11];
+    for i in 0..sig_oid.len() {
+        assert(cert.signature_algorithm.oid[i] == sig_oid[i]);
+    }
+
+    // Issuer and subject: CN
+    let cn_oid = [2, 5, 4, 3];
+    for i in 0..4 {
+        assert(cert.issuer.rdns[0].set[0].oid[i] == cn_oid[i]);
+        assert(cert.subject.rdns[0].set[0].oid[i] == cn_oid[i]);
+    }
+    assert(cert.issuer.rdns[0].set[0].value[0] == 0x43); // 'C'
+    assert(cert.issuer.rdns[0].set[0].value[1] == 0x4e); // 'N'
+
+    // Validity
+    assert(cert.validity.not_before[0] == 0x32);
+    assert(cert.validity.not_after[0] == 0x32);
+
+    // Public key OID: 1.2.840.113549.1.1.1 (rsaEncryption)
+    let pk_oid = [1, 2, 840, 113549, 1, 1, 1];
+    for i in 0..pk_oid.len() {
+        assert(cert.public_key_info.algorithm.oid[i] == pk_oid[i]);
+    }
+
+    // Extension: BasicConstraints (OID: 2.5.29.19)
+    let mut found_bc = false;
+    let bc_oid: [u32; 4] = [2, 5, 29, 19];
+    for i in 0..cert.ext_count {
+        let ext = cert.extensions[i as u32];
+        if (ext.oid[0] == bc_oid[0])
+            & (ext.oid[1] == bc_oid[1])
+            & (ext.oid[2] == bc_oid[2])
+            & (ext.oid[3] == bc_oid[3]) {
+            found_bc = true;
+        }
+    }
+    assert(found_bc);
 }
