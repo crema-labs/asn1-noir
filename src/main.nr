@@ -1,5 +1,6 @@
 mod parsers;
 mod structs;
+mod tests;
 use parsers::{bitstring::parse_bit_string, certificate};
 
 pub fn main(cert_bytes: [u8; 512], expected_subject_cn: [u8; 4]) {
