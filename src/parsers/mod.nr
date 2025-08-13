@@ -2,3 +2,4 @@
 
 pub mod bitstring;
 pub mod tlv;
+pub mod integer;
