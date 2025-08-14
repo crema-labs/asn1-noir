@@ -7,3 +7,4 @@ pub mod octetstring;
 pub mod oid;
 pub mod algorithm;
 pub mod extension;
+pub mod name;

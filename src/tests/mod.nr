@@ -4,3 +4,4 @@ pub mod integer_tests;
 pub mod octetstring_tests;
 pub mod algorithm_tests;
 pub mod extension_tests;
+pub mod name_tests;
