@@ -9,3 +9,4 @@ pub mod algorithm;
 pub mod extension;
 pub mod name;
 pub mod validity;
+pub mod certificate;

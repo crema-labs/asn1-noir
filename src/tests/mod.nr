@@ -6,3 +6,5 @@ pub mod algorithm_tests;
 pub mod extension_tests;
 pub mod name_tests;
 pub mod validity_tests;
+pub mod certificate_tests;
+pub mod oid_tests;
