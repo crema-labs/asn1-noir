@@ -24,14 +24,15 @@ fn main(
             }
         }
 
-        assert(length > 0, "RDN first attribute length must be greater than zero");
+        if length == 0 {
+            proof_result = false;
+        }
 
         for i in 0..64 {
             if i < length {
-                assert(
-                    rdn_first_attribute[i] == cert.issuer.rdns[0].set[0].value[i],
-                    "RDN first attribute does not match expected value",
-                );
+                if rdn_first_attribute[i] != cert.issuer.rdns[0].set[0].value[i] {
+                    proof_result = false;
+                }
             }
         }
     }
@@ -48,7 +49,6 @@ fn main(
             let not_before_byte = cert.validity.not_before[i];
             let not_after_byte = cert.validity.not_after[i];
 
-            // Check against NotBefore
             if still_equal_not_before {
                 if user_byte < not_before_byte {
                     is_after_not_before = false;
@@ -58,7 +58,6 @@ fn main(
                 }
             }
 
-            // Check against NotAfter
             if still_equal_not_after {
                 if user_byte > not_after_byte {
                     is_before_not_after = false;
@@ -69,14 +68,15 @@ fn main(
             }
         }
 
-        assert(
-            is_after_not_before & is_before_not_after,
-            "Certificate is not valid at given user date",
-        );
+        if !(is_after_not_before & is_before_not_after) {
+            proof_result = false;
+        }
     }
 
-    let ans = (check_rdn) | (check_validity);
-    assert(ans, "At least one check must be enabled");
+    let check_selected = check_rdn | check_validity;
+    assert(check_selected, "At least one check must be enabled");
+
+    assert(proof_result, "One or more checks failed");
 }
 
 #[test]
@@ -121,7 +121,6 @@ fn test_main() {
         final_rdn[i] = rdn_first_attribute[i];
     }
 
-    // pick a date inside validity period: 250620120000Z
     let mut user_date: [u8; 16] = [0; 16];
     let between: [u8; 16] = [
         0x32, 0x35, 0x30, 0x36, 0x32, 0x30, 0x31, 0x32, 0x30, 0x30, 0x30, 0x30, 0x5A, 0x00, 0x00,
@@ -137,15 +136,4 @@ fn test_main() {
 
     main(cert_bytes, final_rdn, false, true, user_date);
 
-    // Uncomment to make it fail (bad RDN or out-of-range date)
-    // let bad_rdn: [u8; 64] = [0; 64];
-    // main(cert_bytes, bad_rdn, true, false, user_date);
-    // let mut bad_date: [u8; 16] = [0; 16];
-    // let too_early: [u8; 13] = *b"250619235959Z";
-    // for i in 0..too_early.len() {
-    //     bad_date[i] = too_early[i];
-    // }
-    // main(cert_bytes, final_rdn, false, true, bad_date);
-    // Uncomment to make test fail
-    // main(1, 1);
 }
