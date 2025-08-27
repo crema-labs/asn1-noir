@@ -1,35 +1,83 @@
-
-
 mod parsers;
 mod structs;
-// mod tests;
 use parsers::{bitstring::parse_bit_string, certificate};
 use parsers::certificate::parse_certificate;
 
-fn main(certificate_bytes: [u8; 512], rdn_first_attribute: pub [u8; 64]) {
+fn main(
+    certificate_bytes: [u8; 512],
+    rdn_first_attribute: pub [u8; 64],
+    check_rdn: bool,
+    check_validity: bool,
+    user_date: [u8; 16],
+) {
     let cert: certificate::Certificate = parse_certificate(certificate_bytes);
 
-    let mut length: u8 = 0;
-    let mut found_zero = false;
-    for i in 0..64 {
-        if ((!found_zero as u8) & ((rdn_first_attribute[i] == 0) as u8)) == 1 {
-            length = i as u8;
-            found_zero = true;
+    let mut proof_result: bool = true;
+
+    if check_rdn {
+        let mut length: u8 = 0;
+        let mut found_zero = false;
+        for i in 0..64 {
+            if ((!found_zero as u8) & ((rdn_first_attribute[i] == 0) as u8)) == 1 {
+                length = i as u8;
+                found_zero = true;
+            }
+        }
+
+        assert(length > 0, "RDN first attribute length must be greater than zero");
+
+        for i in 0..64 {
+            if i < length {
+                assert(
+                    rdn_first_attribute[i] == cert.issuer.rdns[0].set[0].value[i],
+                    "RDN first attribute does not match expected value",
+                );
+            }
         }
     }
 
-    assert(length > 0, "RDN first attribute length must be greater than zero");
+    if check_validity {
+        let mut is_after_not_before = true;
+        let mut is_before_not_after = true;
 
-    for i in 0..64 {
-        if i < length {
-            assert(
-                rdn_first_attribute[i] == cert.issuer.rdns[0].set[0].value[i],
-                "RDN first attribute does not match expected value",
-            );
+        let mut still_equal_not_before = true;
+        let mut still_equal_not_after = true;
+
+        for i in 0..16 {
+            let user_byte = user_date[i];
+            let not_before_byte = cert.validity.not_before[i];
+            let not_after_byte = cert.validity.not_after[i];
+
+            // Check against NotBefore
+            if still_equal_not_before {
+                if user_byte < not_before_byte {
+                    is_after_not_before = false;
+                }
+                if user_byte != not_before_byte {
+                    still_equal_not_before = false;
+                }
+            }
+
+            // Check against NotAfter
+            if still_equal_not_after {
+                if user_byte > not_after_byte {
+                    is_before_not_after = false;
+                }
+                if user_byte != not_after_byte {
+                    still_equal_not_after = false;
+                }
+            }
         }
+
+        assert(
+            is_after_not_before & is_before_not_after,
+            "Certificate is not valid at given user date",
+        );
     }
+
+    let ans = (check_rdn) | (check_validity);
+    assert(ans, "At least one check must be enabled");
 }
-
 
 #[test]
 fn test_main() {
@@ -68,16 +116,36 @@ fn test_main() {
     }
 
     let mut final_rdn: [u8; 64] = [0; 64];
-
-    let rdn_first_attribute: [u8; 4] = [0x54, 0x65, 0x73, 0x74]; // "Test"
-
+    let rdn_first_attribute: [u8; 4] = [0x54, 0x65, 0x73, 0x74];
     for i in 0..rdn_first_attribute.len() {
         final_rdn[i] = rdn_first_attribute[i];
     }
 
+    // pick a date inside validity period: 250620120000Z
+    let mut user_date: [u8; 16] = [0; 16];
+    let between: [u8; 16] = [
+        0x32, 0x35, 0x30, 0x36, 0x32, 0x30, 0x31, 0x32, 0x30, 0x30, 0x30, 0x30, 0x5A, 0x00, 0x00,
+        0x00,
+    ]; // "250620120000Z"
+    for i in 0..16 {
+        user_date[i] = between[i];
+    }
 
-    main(cert_bytes, final_rdn);
+    main(cert_bytes, final_rdn, true, true, user_date);
 
+    main(cert_bytes, final_rdn, true, false, user_date);
+
+    main(cert_bytes, final_rdn, false, true, user_date);
+
+    // Uncomment to make it fail (bad RDN or out-of-range date)
+    // let bad_rdn: [u8; 64] = [0; 64];
+    // main(cert_bytes, bad_rdn, true, false, user_date);
+    // let mut bad_date: [u8; 16] = [0; 16];
+    // let too_early: [u8; 13] = *b"250619235959Z";
+    // for i in 0..too_early.len() {
+    //     bad_date[i] = too_early[i];
+    // }
+    // main(cert_bytes, final_rdn, false, true, bad_date);
     // Uncomment to make test fail
     // main(1, 1);
 }
