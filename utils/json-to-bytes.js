@@ -30,5 +30,5 @@ for (const [oid, { d, c }] of Object.entries(input)) {
 
 result += "    ]\n}";
 
-fs.writeFileSync("../src/oids2.nr", result);
+fs.writeFileSync("../src/oids.nr", result);
 console.log("✅ Generated src/oids.nr");
