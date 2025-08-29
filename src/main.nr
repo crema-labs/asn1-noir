@@ -1,8 +1,7 @@
 mod parsers;
 mod structs;
 mod tests;
-use parsers::{bitstring::parse_bit_string, certificate};
-use parsers::certificate::parse_certificate;
+use parsers::certificate;
 
 fn main(
     certificate_bytes: pub [u8; 512],
@@ -11,7 +10,7 @@ fn main(
     check_validity: pub bool,
     user_date: pub [u8; 16],
 ) {
-    let cert: certificate::Certificate = parse_certificate(certificate_bytes);
+    let cert: certificate::Certificate = certificate::parse_certificate(certificate_bytes);
 
     let mut proof_result: bool = true;
 
