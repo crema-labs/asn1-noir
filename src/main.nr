@@ -1,14 +1,15 @@
 mod parsers;
 mod structs;
+mod tests;
 use parsers::{bitstring::parse_bit_string, certificate};
 use parsers::certificate::parse_certificate;
 
 fn main(
-    certificate_bytes: [u8; 512],
+    certificate_bytes: pub [u8; 512],
     rdn_first_attribute: pub [u8; 64],
-    check_rdn: bool,
-    check_validity: bool,
-    user_date: [u8; 16],
+    check_rdn: pub bool,
+    check_validity: pub bool,
+    user_date: pub [u8; 16],
 ) {
     let cert: certificate::Certificate = parse_certificate(certificate_bytes);
 
@@ -78,6 +79,7 @@ fn main(
 
     assert(proof_result, "One or more checks failed");
 }
+
 
 #[test]
 fn test_main() {
